@@ -1,0 +1,10 @@
+[project]
+name = "vyper-foundry-starter"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "mamushi>=0.1.0",
+    "snekmate>=0.1.2",
+]
