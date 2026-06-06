@@ -28,22 +28,28 @@ jobs:
       - name: Show Forge version
         run: forge --version
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.x"
+          python-version: "3.13"
 
-      - name: Install Vyper
-        run: pip install git+https://github.com/vyperlang/vyper.git@v0.4.3
+      - name: Install Python dependencies
+        run: uv sync
 
       - name: Show the Vyper version
-        run: vyper --version
+        run: uv run vyper --version
 
       - name: Run Forge fmt
         run: forge fmt --check
+
+      - name: Run Mamushi fmt
+        run: uv run mamushi --check src/
 
       - name: Run Forge build
         run: forge build --sizes
 
       - name: Run Forge tests
-        run: forge test -vvv
+        run: forge test --ffi -vvv

@@ -15,4 +15,4 @@ snekmate/=lib/snekmate/src/snekmate/
 solady/=lib/snekmate/lib/solady/src/
 solidity-bytes-utils/=lib/snekmate/lib/solidity-bytes-utils/contracts/
 solmate/=lib/snekmate/lib/solmate/src/
-utils/=lib/snekmate/lib/utils/
+utils/=lib/utils/

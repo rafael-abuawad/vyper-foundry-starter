@@ -6,7 +6,7 @@ This repository is a minimal template for writing **Vyper** contracts (including
 
 - [Foundry](https://getfoundry.sh) (`forge`, `cast`, `anvil`, …)
 - [uv](https://docs.astral.sh/uv/)
-- **Python 3.14+** (see [`.python-version`](.python-version))
+- **Python 3.11+** (see [`.python-version`](.python-version) for the local default)
 
 ## Setup
 
@@ -23,54 +23,97 @@ Or, in one step when cloning:
 git clone --recurse-submodules <repo-url>
 ```
 
-Install the Python toolchain so Forge can compile `.vy` files:
+Install the Python toolchain (pins Vyper 0.4.3 into `.venv/`):
 
 ```shell
 uv sync
 ```
 
-Install the Foundry dependencies:
+Foundry uses the uv-managed compiler via `[vyper] path = ".venv/bin/vyper"` in [`foundry.toml`](foundry.toml).
+
+Quick setup via Makefile:
 
 ```shell
-forge install
+make setup
 ```
-
-
 
 ## Project layout
 
 | Path | Purpose |
 |------|---------|
 | `src/` | Vyper contracts (`.vy`) |
-| `test/` | Solidity tests; deploy Vyper with `deployCode("src/...")` |
+| `test/` | Solidity tests; deploy Vyper with `VyperDeployer` + `--ffi` |
 | `interfaces/` | Solidity interfaces for typed calls from tests and scripts |
 | `script/` | Forge deployment scripts (`.s.sol`) |
+| `lib/utils/` | Vendored from [snekmate](https://github.com/pcaversaccio/snekmate) — see [`lib/utils/README.md`](lib/utils/README.md) for attribution and local changes |
 | `lib/forge-std` | Foundry test/script helpers (submodule) |
 | `lib/snekmate` | Snekmate Vyper modules (submodule); referenced from [`foundry.toml`](foundry.toml) |
 
-Example: [`src/Counter.vy`](src/Counter.vy) uses Snekmate’s `ownable`; [`test/Counter.t.sol`](test/Counter.t.sol) deploys it and asserts behavior.
+Example: [`src/Counter.vy`](src/Counter.vy) uses Snekmate's `ownable`; [`test/Counter.t.sol`](test/Counter.t.sol) deploys it via `VyperDeployer` and asserts behavior.
+
+## VyperDeployer workflow
+
+Tests and scripts compile Vyper contracts at runtime through FFI:
+
+```solidity
+import {VyperDeployer} from "utils/VyperDeployer.sol";
+
+VyperDeployer deployer = new VyperDeployer();
+ICounter counter = ICounter(deployer.deployContract("src/", "Counter"));
+```
+
+- Path: `"src/"`, fileName: `"Counter"` (no `.vy` suffix).
+- **`--ffi` is required** for `forge test` and `forge script`.
+- `lib/utils/compile.py` reads `forge config --json` and adds `-p` flags for each entry in `libs`, so `from snekmate.<module> import ...` resolves the same way as `forge build`.
+- `VyperDeployer` invokes `.venv/bin/python` (created by `uv sync`) so FFI compilation uses the pinned Vyper toolchain.
+- Snekmate `ownable` sets the deployer (`VyperDeployer` address) as owner; use `vm.prank(address(vyperDeployer))` before owner-only calls in tests.
+- Override EVM version and optimizer: `deployContract("src/", "Counter", "prague", "gas")`.
+
+Native Foundry Vyper compilation (`forge build`) remains enabled for artifacts, gas snapshots, `forge create`, and `forge inspect Counter abi`.
+
+## Snekmate modules
+
+Import Snekmate from the git submodule (not PyPI):
+
+```python
+from snekmate.auth import ownable as ow
+initializes: ow
+```
+
+See [`src/Counter.vy`](src/Counter.vy) for the `initializes:` pattern.
+
+## EVM version alignment
+
+[`foundry.toml`](foundry.toml) sets `evm_version = "prague"`, matching Vyper 0.4.3's default. Use the `deployContract(..., "prague", "gas")` overload when overriding at deploy time.
 
 ## Common commands
 
 ### Build
 
 ```shell
-forge build
+make build
+# or: forge build
 ```
 
 ### Test
 
 ```shell
-forge test
+make test
+# or: forge test --ffi -vvv
 ```
 
 ### Format
 
 ```shell
-forge fmt
+make fmt
+# or: forge fmt && uv run mamushi src/
 ```
 
-(Formats Solidity; Vyper formatting is outside Forge—use your editor or Vyper tooling.)
+### Format check
+
+```shell
+make fmt-check
+```
 
 ### Gas snapshots
 
@@ -89,7 +132,13 @@ anvil
 Replace `<your_rpc_url>` and `<your_private_key>` (or use a wallet / ledger flow per the Foundry book):
 
 ```shell
-forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
+forge script script/Counter.s.sol:CounterScript --ffi --rpc-url <your_rpc_url> --private-key <your_private_key> --broadcast
+```
+
+Local Anvil:
+
+```shell
+make deploy-local
 ```
 
 ### Cast and help
@@ -101,6 +150,10 @@ forge --help
 anvil --help
 cast --help
 ```
+
+## Known limitations
+
+- **`forge coverage` does not support Vyper** (see Foundry docs).
 
 ## Documentation
 

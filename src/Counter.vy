@@ -1,4 +1,5 @@
 # pragma version ~=0.4.3
+# @license GNU Affero General Public License v3.0 only
 
 
 from snekmate.auth import ownable as ow
